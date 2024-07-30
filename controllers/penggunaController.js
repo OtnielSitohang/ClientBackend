@@ -66,7 +66,6 @@ exports.updateProfile = (req, res) => {
   const { foto_base64, email, tempat_tinggal, tanggal_lahir } = req.body;
   const { id } = req.params;
 
-  // Construct the update query based on provided fields
   let updateFields = [];
   let updateValues = [];
 
@@ -91,13 +90,10 @@ exports.updateProfile = (req, res) => {
     return res.status(400).json({ message: 'No fields to update' });
   }
 
-  // Add id for WHERE clause
   updateValues.push(id);
 
-  // Prepare the SQL update statement
   const updateQuery = `UPDATE Pengguna SET ${updateFields.join(', ')} WHERE id = ?`;
 
-  // Execute the update query
   db.query(updateQuery, updateValues, (err, result) => {
     if (err) {
       console.error('Error updating user profile:', err);
@@ -108,7 +104,6 @@ exports.updateProfile = (req, res) => {
       return res.status(404).json({ message: 'User not found or no changes applied' });
     }
 
-    // Retrieve updated user data from the database
     const retrieveQuery = 'SELECT id, username, nama_lengkap, email, tempat_tinggal, tanggal_lahir, role, foto_base64 FROM Pengguna WHERE id = ?';
     db.query(retrieveQuery, [id], (err, rows) => {
       if (err) {
@@ -120,16 +115,15 @@ exports.updateProfile = (req, res) => {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      // Send updated user data in the response
       const updatedUser = rows[0];
-
       res.json({
         message: 'User profile updated successfully',
-        data: updatedUser  // Send updated user data in the response
+        data: updatedUser
       });
     });
   });
 };
+
 
 
 
