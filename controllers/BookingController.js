@@ -94,45 +94,49 @@ exports.bookField = async (req, res) => {
 };
 
 exports.getBookingsByUserId = (req, res) => {
-    const userId = parseInt(req.params.userId, 10);
-    const today = new Date();
-    const sevenDaysLater = new Date(today);
-    sevenDaysLater.setDate(today.getDate() + 7);
+  const userId = parseInt(req.params.userId, 10);
+  const today = new Date();
+  const sevenDaysLater = new Date(today);
+  sevenDaysLater.setDate(today.getDate() + 7);
 
-    // Format tanggal dalam format YYYY-MM-DD
-    const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
+  // Format tanggal dalam format YYYY-MM-DD
+  const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+  };
 
-    const query = `
-        SELECT
-            b.tanggal_booking,
-            b.tanggal_penggunaan,
-            b.sesi,
-            p.nama_lengkap AS nama_user,
-            b.harga,
-            CASE WHEN b.status_konfirmasi = 1 THEN 'Confirmed' ELSE 'Pending' END AS status_pembayaran,
-            l.nama_lapangan,
-            jl.nama AS jenis_lapangan
-        FROM booking b
-        JOIN pengguna p ON b.pengguna_id = p.id
-        JOIN lapangan l ON b.lapangan_id = l.id
-        JOIN jenis_lapangan jl ON l.jenis_lapangan_id = jl.id
-        WHERE b.pengguna_id = ? AND b.tanggal_penggunaan BETWEEN ? AND ?
-    `;
+  const query = `
+      SELECT
+          b.tanggal_booking,
+          b.tanggal_penggunaan,
+          b.sesi,
+          p.nama_lengkap AS nama_user,
+          b.harga,
+          CASE 
+              WHEN b.status_konfirmasi = 1 THEN 'Confirmed'
+              WHEN b.status_konfirmasi = 0 THEN 'Pending'
+              ELSE 'Unknown' 
+          END AS status_pembayaran,
+          l.nama_lapangan,
+          jl.nama AS jenis_lapangan
+      FROM booking b
+      JOIN pengguna p ON b.pengguna_id = p.id
+      JOIN lapangan l ON b.lapangan_id = l.id
+      JOIN jenis_lapangan jl ON l.jenis_lapangan_id = jl.id
+      WHERE b.pengguna_id = ? AND b.tanggal_penggunaan BETWEEN ? AND ?
+  `;
 
-    db.query(query, [userId, formatDate(today), formatDate(sevenDaysLater)], (err, results) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ message: 'Internal Server Error' });
-        }
+  db.query(query, [userId, formatDate(today), formatDate(sevenDaysLater)], (err, results) => {
+      if (err) {
+          console.error(err);
+          return res.status(500).json({ message: 'Internal Server Error' });
+      }
 
-        res.json({
-            message: 'Bookings retrieved successfully',
-            data: results
-        });
-    });
+      res.json({
+          message: 'Bookings retrieved successfully',
+          data: results
+      });
+  });
 };
