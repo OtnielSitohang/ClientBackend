@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors'); // Import CORS middleware
 const authRoutes = require('./route/auth'); // Import route untuk autentikasi
 const config = require('./config'); // Konfigurasi koneksi database
+require('dotenv').config();
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
