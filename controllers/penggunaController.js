@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../config'); // Import db from config
 
 // Path to default.jpg in assets folder
-const defaultImagePath = path.join(__dirname, '../assets/default.jpg');
+const defaultImagePath = path.join(__dirname, '../assets/defaultFoto.jpg');
 
 // Function to convert file to base64
 function fileToBase64(filePath) {
@@ -13,14 +13,14 @@ function fileToBase64(filePath) {
   return Buffer.from(fileData).toString('base64');
 }
 
+
 exports.register = (req, res) => {
-  const { username, password, nama_lengkap, tanggal_lahir, email, tempat_tinggal, role } = req.body;
+  const { username, password, nama_lengkap, tanggal_lahir, email, tempat_tinggal } = req.body;
 
-  if (role !== 'admin' && role !== 'customer') {
-    return res.status(400).json({ message: 'Role must be either "admin" or "customer"' });
-  }
+  // Set default role as 'customer'
+  const role = 'customer';
 
-  // Convert default.jpg to base64
+  // Convert defaultFoto.jpg to base64
   const foto_base64 = fileToBase64(defaultImagePath);
 
   // Hash password using bcrypt
@@ -35,7 +35,7 @@ exports.register = (req, res) => {
 
     // Insert new pengguna into the database
     const insertQuery = 'INSERT INTO Pengguna (username, password, nama_lengkap, foto_base64, tanggal_lahir, email, tempat_tinggal, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-    const values = [newPengguna.username, newPengguna.passwordHash, newPengguna.nama_lengkap, newPengguna.foto_base64, newPengguna.tanggal_lahir, newPengguna.email, newPengguna.tempat_tinggal, newPengguna.role];
+    const values = [newPengguna.username, newPengguna.password, newPengguna.nama_lengkap, newPengguna.foto_base64, newPengguna.tanggal_lahir, newPengguna.email, newPengguna.tempat_tinggal, newPengguna.role];
 
     db.query(insertQuery, values, (err, result) => {
       if (err) {
@@ -43,7 +43,6 @@ exports.register = (req, res) => {
         return res.status(500).json({ message: 'Failed to create new pengguna' });
       }
 
-      // Successful response with newly created pengguna data
       res.status(201).json({
         message: 'New pengguna created successfully',
         data: {
@@ -60,7 +59,6 @@ exports.register = (req, res) => {
     });
   });
 };
-
 
 exports.updateProfile = (req, res) => {
   const { foto_base64, email, tempat_tinggal, tanggal_lahir } = req.body;
