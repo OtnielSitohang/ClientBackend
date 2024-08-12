@@ -6,7 +6,7 @@ const secretKey = 'your_secret_key'; // Ganti dengan secret key yang lebih kompl
 // Controller untuk login pengguna
 const login = (req, res) => {
   const { username, password } = req.body;
-  console.log("Route Login")
+  // console.log("Route Login")
 
   Pengguna.findByUsername(username, (err, pengguna) => {
     if (err) {

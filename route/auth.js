@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { login } = require('../controllers/AuthController'); 
 const { register, updateProfile, changePassword } = require('../controllers/penggunaController');
-const { checkAvailability, bookField, getAllJenisLapangan , getBookingsByUserId } = require('../controllers/BookingController');
+const { claimVoucher, checkVoucherCode,checkAvailability, bookField, getAllJenisLapangan , getBookingsByUserId } = require('../controllers/BookingController');
 const { checkUserByUsernameAndEmail, resetPassword } = require('../controllers/PasswordController');
 
 // Route untuk login
@@ -19,6 +19,8 @@ router.post('/lapangan/available', checkAvailability);
 router.post('/lapangan/book', bookField);
 router.get('/lapangan/all', getAllJenisLapangan);
 router.get('/bookings/:userId', getBookingsByUserId);
+router.post('/voucher/check', checkVoucherCode);
+router.post('/voucher/klaim', claimVoucher)
 
 router.post('/check-user', checkUserByUsernameAndEmail);
 router.post('/change-password', resetPassword);

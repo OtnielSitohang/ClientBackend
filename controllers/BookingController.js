@@ -1,5 +1,6 @@
-const db = require('../config'); 
-const formatDate = date => date.toISOString().split('T')[0];
+const db = require('../config');
+const moment = require('moment-timezone');
+
 
 
 // Fungsi untuk mengambil semua jenis lapangan
@@ -68,30 +69,27 @@ exports.checkAvailability = async (req, res) => {
 
 exports.bookField = async (req, res) => {
   try {
-    const { pengguna_id, lapangan_id, jenis_lapangan_id, tanggal_booking, tanggal_penggunaan, sesi, foto_base64, harga } = req.body;
+    // Destructure data from request body
+    const { pengguna_id, lapangan_id, jenis_lapangan_id, tanggal_booking, tanggal_penggunaan, sesi, foto_base64, harga, voucher_id } = req.body;
 
-    // Query untuk melakukan booking dengan data yang diterima dari request body
-    const query = `
-      INSERT INTO booking (pengguna_id, lapangan_id, jenis_lapangan_id, tanggal_booking, tanggal_penggunaan, sesi, bukti_pembayaran, harga)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    // Insert booking with voucher_id
+    const bookingQuery = `
+      INSERT INTO booking (pengguna_id, lapangan_id, jenis_lapangan_id, tanggal_booking, tanggal_penggunaan, sesi, bukti_pembayaran, harga, status_konfirmasi, voucher_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
     `;
 
-    const values = [pengguna_id, lapangan_id, jenis_lapangan_id, tanggal_booking, tanggal_penggunaan, sesi, foto_base64, harga];
+    // Set default value for voucher_id if not provided
+    const bookingValues = [pengguna_id, lapangan_id, jenis_lapangan_id, tanggal_booking, tanggal_penggunaan, sesi, foto_base64, harga, voucher_id || null];
 
-    // Jalankan query dengan data yang diterima
-    db.query(query, values, (error, results) => {
-      if (error) {
-        console.error('Error executing query:', error);
-        res.status(500).json({ message: 'Error creating booking' });
-      } else {
-        res.status(201).json({ message: 'Booking created successfully' });
-      }
-    });
+    await db.query(bookingQuery, bookingValues);
+
+    res.status(201).json({ message: 'Booking created successfully' });
   } catch (error) {
     console.error('Error creating booking:', error);
     res.status(500).json({ message: 'Error creating booking' });
   }
 };
+
 
 exports.getBookingsByUserId = (req, res) => {
   const userId = parseInt(req.params.userId, 10);
@@ -139,4 +137,154 @@ exports.getBookingsByUserId = (req, res) => {
           data: results
       });
   });
+};
+
+// Fungsi untuk memeriksa kode voucher
+exports.checkVoucherCode = async (req, res) => {
+  try {
+    const { voucher_code } = req.body; // Mengambil kode voucher dari body request
+
+    if (!voucher_code) {
+      return res.status(400).json({ message: 'Voucher code is required' });
+    }
+
+    // Query untuk memeriksa voucher
+    const query = `
+      SELECT id, diskon 
+      FROM voucher
+      WHERE kode = ? 
+        AND status = 1
+        AND tanggal_mulai <= CURDATE()
+        AND tanggal_selesai >= CURDATE()
+    `;
+
+    // Gunakan db.query untuk menjalankan query
+    db.query(query, [voucher_code], (error, results) => {
+      if (error) {
+        console.error('Error fetching voucher:', error);
+        return res.status(500).json({ message: 'Error fetching voucher' });
+      }
+
+      if (results.length > 0) {
+        const voucher = results[0];
+        res.status(200).json({
+          valid: true,
+          discount: voucher.diskon, // Misalnya diskon dalam persen
+          id: voucher.id // Menambahkan ID voucher
+        });
+      } else {
+        res.status(404).json({
+          valid: false,
+          message: 'Voucher not found or expired'
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error checking voucher code:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+
+
+
+
+// Fungsi untuk mengklaim voucher
+exports.claimVoucher = async (req, res) => {
+  try {
+    const { pengguna_id, voucher_code } = req.body; // Mengambil pengguna_id dan kode voucher dari body request
+
+    if (!voucher_code || !pengguna_id) {
+      return res.status(400).json({ message: 'Voucher code and pengguna_id are required' });
+    }
+
+    // Query untuk memeriksa voucher
+    const checkQuery = `
+      SELECT id, diskon, batas_penggunaan
+      FROM voucher
+      WHERE kode = ? 
+        AND status = 1
+        AND tanggal_mulai <= CURDATE()
+        AND tanggal_selesai >= CURDATE()
+        AND batas_penggunaan > 0
+    `;
+
+    db.query(checkQuery, [voucher_code], (error, results) => {
+      if (error) {
+        console.error('Error fetching voucher:', error);
+        return res.status(500).json({ message: 'Error fetching voucher' });
+      }
+
+      if (results.length > 0) {
+        const voucher = results[0];
+
+        // Cek apakah pengguna sudah menggunakan voucher ini
+        const checkUsageQuery = `
+          SELECT * FROM pengguna_voucher
+          WHERE pengguna_id = ? 
+            AND voucher_id = ?
+        `;
+
+        db.query(checkUsageQuery, [pengguna_id, voucher.id], (usageError, usageResults) => {
+          if (usageError) {
+            console.error('Error checking voucher usage:', usageError);
+            return res.status(500).json({ message: 'Error checking voucher usage' });
+          }
+
+          if (usageResults.length > 0) {
+            // Jika pengguna sudah menggunakan voucher ini
+            return res.status(400).json({
+              success: false,
+              message: 'Voucher has already been claimed by this user'
+            });
+          }
+
+          // Update batas penggunaan voucher
+          const updateQuery = `
+            UPDATE voucher
+            SET batas_penggunaan = batas_penggunaan - 1
+            WHERE kode = ?
+          `;
+
+          db.query(updateQuery, [voucher_code], (updateError) => {
+            if (updateError) {
+              console.error('Error updating voucher:', updateError);
+              return res.status(500).json({ message: 'Error updating voucher' });
+            }
+
+            // Simpan entri ke pengguna_voucher
+            const insertUsageQuery = `
+              INSERT INTO pengguna_voucher (pengguna_id, voucher_id, tanggal_penggunaan)
+              VALUES (?, ?, ?)
+            `;
+
+            // Mengambil tanggal saat ini dalam zona waktu GMT+7
+            const currentDate = moment().tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss');
+
+            db.query(insertUsageQuery, [pengguna_id, voucher.id, currentDate], (insertError) => {
+              if (insertError) {
+                console.error('Error inserting voucher usage:', insertError);
+                return res.status(500).json({ message: 'Error inserting voucher usage' });
+              }
+
+              res.status(200).json({
+                success: true,
+                message: 'Voucher successfully claimed',
+                discount: voucher.diskon, // Misalnya diskon dalam bentuk angka, seperti Rp 30.000
+                voucher_id: voucher.id // Menyertakan ID voucher dalam respons
+              });
+            });
+          });
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: 'Voucher not found, expired, or no usage left'
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error claiming voucher:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
 };
